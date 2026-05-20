@@ -45,12 +45,6 @@ Stars: ⭐ trivial → ⭐⭐⭐⭐⭐ very hard.
 | [ ] | 11 | No HEAD method support | ⭐ | ⭐ | Register `HTTP_HEAD` in `web_server_idf::begin()` + accept in schema. |
 | [ ] | 12 | CORS preflight not endpoint-aware | ⭐ | ⭐⭐ | Endpoint-specific `Access-Control-Allow-Methods`. |
 
-### What I'd attack first
-
-- **Hotel-lock production-readiness:** #5 (storage) and #1 (concurrency safety) are the only ones that matter.
-- **Getting upstreamed:** #1 and #3 are the gates. #10 is table-stakes. #2 fits neatly inside the existing `web_server_idf` PR.
-
-Everything else is nice-to-have / v2.
 
 ## License
 
