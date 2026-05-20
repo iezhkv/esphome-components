@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>access_control tester</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --panel: #161922;
+    --border: #2a2f3d;
+    --text: #d6dae3;
+    --muted: #8a92a6;
+    --ok: #3fb950;
+    --err: #f85149;
+    --warn: #d29922;
+    --accent: #58a6ff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 20px;
+    background: var(--bg); color: var(--text);
+    font: 14px/1.4 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+  h1 { font-size: 16px; margin: 0 0 16px; color: var(--accent); }
+  h2 { font-size: 12px; margin: 0 0 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; }
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 16px; margin-bottom: 16px; }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  label { color: var(--muted); font-size: 12px; }
+  input[type=text], input[type=number] {
+    background: #0b0d13; color: var(--text);
+    border: 1px solid var(--border); border-radius: 4px;
+    padding: 6px 8px; font: inherit;
+  }
+  input[type=checkbox] { accent-color: var(--accent); }
+  button {
+    background: var(--accent); color: #0b0d13; border: none;
+    padding: 6px 12px; border-radius: 4px; cursor: pointer;
+    font: inherit; font-weight: 600;
+  }
+  button:hover { filter: brightness(1.1); }
+  button.danger { background: var(--err); color: #fff; }
+  button.secondary { background: transparent; color: var(--text); border: 1px solid var(--border); font-weight: 400; }
+  button.icon { padding: 3px 8px; font-size: 12px; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  th { color: var(--muted); font-weight: 500; font-size: 11px; text-transform: uppercase; }
+  td.uid { font-family: ui-monospace, monospace; color: var(--accent); }
+  td.actions { text-align: right; white-space: nowrap; }
+  td.actions button { margin-left: 4px; }
+  .table-empty { padding: 20px; text-align: center; color: var(--muted); }
+  td input[type=text], td input[type=number] { width: 100%; padding: 4px 6px; }
+  .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+  .global { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .global input { max-width: 220px; }
+  .small { font-size: 11px; color: var(--muted); }
+  details summary { cursor: pointer; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 10px; }
+  details[open] summary { margin-bottom: 10px; }
+  .log-entry { margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px dashed var(--border); font-size: 12px; }
+  .log-entry:last-child { border-bottom: none; }
+  .log-method { color: var(--accent); font-weight: 600; }
+  .log-url { color: var(--muted); }
+  .log-ok { color: var(--ok); }
+  .log-err { color: var(--err); }
+  .log-warn { color: var(--warn); }
+  pre.log-body { background: #0b0d13; border: 1px solid var(--border); border-radius: 4px; padding: 6px 8px; margin: 4px 0 0; overflow: auto; max-height: 200px; font-size: 12px; }
+  #toast {
+    position: fixed; top: 16px; left: 50%; transform: translateX(-50%) translateY(-200%);
+    background: var(--panel); border: 1px solid var(--border); border-left-width: 4px;
+    border-radius: 6px; padding: 10px 16px; min-width: 240px; max-width: 80vw;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+    transition: transform 0.25s ease-out;
+    z-index: 1000; font-size: 13px;
+  }
+  #toast.show { transform: translateX(-50%) translateY(0); }
+  #toast.ok   { border-left-color: var(--ok);   color: var(--ok); }
+  #toast.warn { border-left-color: var(--warn); color: var(--warn); }
+  #toast.err  { border-left-color: var(--err);  color: var(--err); }
+</style>
+</head>
+<body>
+
+<h1>access_control · tester</h1>
+<div id="toast"></div>
+
+<div class="panel">
+  <div class="global">
+    <label>Host</label>
+    <input type="text" id="host" value="192.168.8.10">
+    <label>ID</label>
+    <input type="text" id="cid" value="door_controller">
+    <button class="secondary" onclick="opList()">refresh</button>
+    <span class="small" id="conn_status"></span>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>Add credential</h2>
+  <div class="row">
+    <input type="text" id="add_uid" placeholder="uid (e.g. 04AABBCC)" style="flex: 2;">
+    <input type="number" id="add_exp" placeholder="expires_at (0 = never)" value="0" style="flex: 1;">
+    <label><input type="checkbox" id="add_ot"> one-time</label>
+    <label><input type="checkbox" id="add_priv"> privileged</label>
+    <button onclick="opAdd()">add</button>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="toolbar">
+    <h2 style="margin: 0;">Credentials</h2>
+    <div class="row">
+      <button class="secondary" onclick="opList()">refresh</button>
+      <button class="danger" id="del_all_btn" onclick="opDeleteAll()">delete all</button>
+    </div>
+  </div>
+  <div id="creds_wrap">
+    <div class="table-empty">loading…</div>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>Scan (engages relay if granted)</h2>
+  <div class="row">
+    <input type="text" id="scan_uid" placeholder="uid" style="flex: 1; max-width: 300px;">
+    <button onclick="opScan()">scan</button>
+  </div>
+</div>
+
+<details class="panel">
+  <summary>Response log</summary>
+  <div id="log"></div>
+</details>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const baseUrl = () => `http://${$('host').value}/access_control/${$('cid').value}`;
+
+let editingUid = null;  // uid currently in inline-edit mode, or null
+
+function setStatus(text, cls) {
+  const el = $('conn_status');
+  el.textContent = text;
+  el.className = 'small ' + (cls || '');
+}
+
+// Friendly messages by error code returned in body.error.
+const ERROR_MESSAGES = {
+  ALREADY_EXISTS:        'Credential already exists',
+  NOT_FOUND:             'Credential not found',
+  INVALID_UID:           'Invalid UID (must be 1–31 hex chars)',
+  CONFIRMATION_REQUIRED: 'Wrong / missing confirmation string',
+  CAPACITY_EXCEEDED:     'Credential list is full',
+  BAD_INPUT:             'Bad request',
+  FORBIDDEN:             'Forbidden',
+  MISSING_UID:           'Missing UID in path',
+  METHOD_NOT_ALLOWED:    'Method not allowed for this path',
+};
+
+// Friendly messages for scan codes (used only on /scan responses).
+const SCAN_CODES = {
+  '':                              'Granted — relay engaged',
+  NOT_FOUND:                       'Unknown UID',
+  EXPIRED:                         'Credential expired',
+  RESTRICTED:                      'Restricted (DND active)',
+  DEBOUNCED:                       'Too soon after previous scan',
+  DOOR_ALREADY_OPEN:               'Door already open',
+  DOOR_ALREADY_UNLOCKED:           'Door already unlocked',
+  DOOR_ALREADY_OPEN_AND_UNLOCKED:  'Door already open & unlocked',
+};
+
+let toastTimer = null;
+function toast(text, level = 'ok') {
+  const el = $('toast');
+  el.textContent = text;
+  el.className = 'show ' + level;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.className = level; }, 3000);
+}
+
+// Decide on a friendly message + level for a completed call.
+function reportResult({ verb, body, status, error }, contextLabel) {
+  if (error) {
+    toast(`${contextLabel}: connection failed (${error})`, 'err');
+    return;
+  }
+  if (!body) {
+    toast(`${contextLabel}: HTTP ${status} (no body)`, status >= 400 ? 'err' : 'warn');
+    return;
+  }
+  if (body.error) {
+    const friendly = ERROR_MESSAGES[body.error] || body.error;
+    const level = (status >= 500) ? 'err' : 'warn';
+    toast(`${contextLabel}: ${friendly}`, level);
+    return;
+  }
+  toast(`${contextLabel}: OK`, 'ok');
+}
+
+function logEntry({method, path, status, body, error}) {
+  const log = $('log');
+  const entry = document.createElement('div');
+  entry.className = 'log-entry';
+  const statusClass = error ? 'log-err'
+    : (status === 200 && !(body && body.error)) ? 'log-ok'
+    : 'log-warn';
+  const statusText = error ? `ERR ${error}` : `${status}${body && body.error ? ` ${body.error}` : ''}`;
+  entry.innerHTML = `
+    <div><span class="log-method">${method}</span> <span class="log-url">${path}</span> · <span class="${statusClass}">${statusText}</span></div>
+    <pre class="log-body">${body ? JSON.stringify(body, null, 2) : '(no body)'}</pre>
+  `;
+  log.prepend(entry);
+}
+
+async function call(method, path, form) {
+  const url = baseUrl() + path;
+  const opts = { method };
+  if (form) {
+    const body = new URLSearchParams();
+    for (const [k, v] of Object.entries(form)) body.append(k, v);
+    opts.headers = { 'Content-Type': 'application/x-www-form-urlencoded' };
+    opts.body = body.toString();
+  }
+  try {
+    const resp = await fetch(url, opts);
+    let body = null;
+    try { body = await resp.json(); } catch { body = { _raw: await resp.text() }; }
+    logEntry({ method, path, status: resp.status, body });
+    return { verb: method, status: resp.status, ok: resp.ok && !(body && body.error), body };
+  } catch (e) {
+    logEntry({ method, path, error: e.message });
+    return { verb: method, status: 0, ok: false, body: null, error: e.message };
+  }
+}
+
+function fmtExp(ts) {
+  if (!ts) return '<span class="small">never</span>';
+  return new Date(ts * 1000).toISOString().replace('T', ' ').split('.')[0] + ' UTC';
+}
+
+function renderTable(creds) {
+  const wrap = $('creds_wrap');
+  if (creds.length === 0) {
+    wrap.innerHTML = '<div class="table-empty">no credentials · use the Add form above</div>';
+    return;
+  }
+  const rows = creds.map(c => {
+    if (c.uid === editingUid) {
+      return `<tr data-uid="${c.uid}">
+        <td class="uid">${c.uid}</td>
+        <td><input type="number" id="edit_exp" value="${c.expires_at}"></td>
+        <td><input type="checkbox" id="edit_ot" ${c.one_time ? 'checked' : ''}></td>
+        <td><input type="checkbox" id="edit_priv" ${c.privileged ? 'checked' : ''}></td>
+        <td class="actions">
+          <button class="icon" onclick="saveEdit('${c.uid}')">save</button>
+          <button class="icon secondary" onclick="cancelEdit()">cancel</button>
+        </td>
+      </tr>`;
+    }
+    return `<tr data-uid="${c.uid}">
+      <td class="uid">${c.uid}</td>
+      <td>${fmtExp(c.expires_at)}</td>
+      <td>${c.one_time ? '✓' : ''}</td>
+      <td>${c.privileged ? '✓' : ''}</td>
+      <td class="actions">
+        <button class="icon secondary" onclick="startEdit('${c.uid}')">edit</button>
+        <button class="icon danger" onclick="opDeleteOne('${c.uid}')">delete</button>
+      </td>
+    </tr>`;
+  }).join('');
+  wrap.innerHTML = `
+    <table>
+      <thead><tr><th>uid</th><th>expires</th><th>one-time</th><th>priv</th><th></th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div class="small" style="margin-top: 8px;">count: ${creds.length}</div>
+  `;
+}
+
+async function opList() {
+  setStatus('…');
+  const { ok, body, error } = await call('GET', '/credentials');
+  if (error || !body) {
+    setStatus('connection failed', 'log-err');
+    $('creds_wrap').innerHTML = `<div class="table-empty">failed to reach device</div>`;
+    return;
+  }
+  setStatus(`ok · ${body.count} credentials`, 'log-ok');
+  renderTable(body.credentials || []);
+}
+
+function startEdit(uid) {
+  editingUid = uid;
+  opList();
+}
+
+function cancelEdit() {
+  editingUid = null;
+  opList();
+}
+
+async function saveEdit(uid) {
+  const exp = $('edit_exp').value || 0;
+  const ot = $('edit_ot').checked ? 1 : 0;
+  const priv = $('edit_priv').checked ? 1 : 0;
+  const result = await call('PATCH', `/credentials/${encodeURIComponent(uid)}`,
+             { expires_at: exp, one_time: ot, privileged: priv });
+  reportResult(result, `update ${uid}`);
+  editingUid = null;
+  opList();
+}
+
+async function opAdd() {
+  const uid = $('add_uid').value.trim();
+  if (!uid) { toast('UID is empty', 'warn'); return; }
+  const result = await call('POST', '/credentials', {
+    uid,
+    expires_at: $('add_exp').value || 0,
+    one_time: $('add_ot').checked ? 1 : 0,
+    privileged: $('add_priv').checked ? 1 : 0,
+  });
+  reportResult(result, `add ${uid}`);
+  if (result.ok) {
+    $('add_uid').value = '';
+    $('add_exp').value = '0';
+    $('add_ot').checked = false;
+    $('add_priv').checked = false;
+  }
+  opList();
+}
+
+async function opDeleteOne(uid) {
+  const result = await call('DELETE', `/credentials/${encodeURIComponent(uid)}`);
+  reportResult(result, `delete ${uid}`);
+  opList();
+}
+
+let delAllArmed = false;
+let delAllTimer = null;
+async function opDeleteAll() {
+  const btn = $('del_all_btn');
+  if (!delAllArmed) {
+    delAllArmed = true;
+    btn.textContent = 'click again to confirm';
+    delAllTimer = setTimeout(() => {
+      delAllArmed = false;
+      btn.textContent = 'delete all';
+    }, 5000);
+    return;
+  }
+  clearTimeout(delAllTimer);
+  delAllArmed = false;
+  btn.textContent = 'delete all';
+  const confirmStr = encodeURIComponent('delete all credentials');
+  const result = await call('DELETE', `/credentials?confirm=${confirmStr}`);
+  reportResult(result, 'delete all');
+  opList();
+}
+
+async function opScan() {
+  const uid = $('scan_uid').value.trim();
+  if (!uid) { toast('UID is empty', 'warn'); return; }
+  const result = await call('POST', '/scan', { uid });
+  // Scan has its own outcome semantics (granted/denied with a reason code).
+  if (result.error) {
+    toast(`scan: connection failed (${result.error})`, 'err');
+  } else if (result.body?.error) {
+    toast(`scan: ${ERROR_MESSAGES[result.body.error] || result.body.error}`, 'warn');
+  } else if (result.body) {
+    const granted = !!result.body.granted;
+    const code = result.body.code ?? '';
+    const reason = SCAN_CODES[code] || code || (granted ? 'Granted' : 'Denied');
+    toast(`scan ${uid}: ${reason}`, granted ? 'ok' : 'warn');
+  }
+}
+
+// Enter key submits Add
+$('add_uid').addEventListener('keydown', (e) => { if (e.key === 'Enter') opAdd(); });
+$('scan_uid').addEventListener('keydown', (e) => { if (e.key === 'Enter') opScan(); });
+
+opList();
+</script>
+
+</body>
+</html>

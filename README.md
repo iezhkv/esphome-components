@@ -21,6 +21,7 @@ Then configure the components you want. See per-component READMEs below.
 |---|---|
 | [`web_server_idf`](components/web_server_idf/) | Drop-in override of ESPHome's IDF web server backend. Adds `PUT` / `DELETE` / `PATCH` registration, raw request body access via `AsyncWebServerRequest::body()`, and an expanded HTTP status code map. Upstream proposal: [esphome/esphome#16517](https://github.com/esphome/esphome/pull/16517). |
 | [`webhooks`](components/webhooks/) | User-defined HTTP endpoints declared in YAML. Each entry registers a path + method, runs an `on_request` automation, and returns a templated `body:` or structured `json:` response. Upstream proposal: [esphome discussion #3673](https://github.com/orgs/esphome/discussions/3673). |
+| [`access_control`](components/access_control/) | RFID/wiegand-driven door lock with NVS-persisted credentials and a REST API for CRUD + scan. Hotel-room style: external system manages credentials, ESP validates locally. Ships with a single-file browser tester (`tester.html`) and a Python integration test suite. |
 
 ## Status
 
